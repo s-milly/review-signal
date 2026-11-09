@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Signal</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d68;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --neg: #e34948; --mid: #f0efec;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b; --good-text: #006300;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --neg: #e66767; --mid: #383835; --good-text: #0ca30c;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); }
+h1, h2, h3 { margin: 0; font-weight: 600; text-wrap: balance; }
+h1 { font-size: 20px; }
+h2 { font-size: 22px; }
+h3 { font-size: 15px; }
+p { margin: 0; text-wrap: pretty; }
+.small { font-size: 13px; color: var(--ink-2); }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; padding: 18px 24px; border-bottom: 1px solid var(--grid); }
+.test-banner { background: var(--warning); color: #0b0b0b; padding: 8px 24px; font-weight: 600; font-size: 14px; }
+
+.app { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: calc(100vh - 60px); }
+aside { border-right: 1px solid var(--grid); display: flex; flex-direction: column; max-height: calc(100vh - 60px); position: sticky; top: 0; }
+.list-tools { padding: 14px; display: grid; gap: 8px; border-bottom: 1px solid var(--grid); }
+input[type=search], select { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); }
+.list { overflow-y: auto; overscroll-behavior: contain; flex: 1; }
+.list button { display: flex; width: 100%; justify-content: space-between; gap: 10px; align-items: center; text-align: left;
+  font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--grid); padding: 10px 14px; cursor: pointer; }
+.list button[aria-current="true"] { background: var(--surface); box-shadow: inset 3px 0 0 var(--s1); }
+@media (hover: hover) and (pointer: fine) { .list button:hover { background: var(--surface); } }
+.tag { font-size: 11px; font-weight: 600; color: var(--ink-2); border: 1px solid var(--axis); border-radius: 999px; padding: 1px 7px; flex: none; }
+.list .nm { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+main { padding: 24px; display: grid; gap: 20px; align-content: start; max-width: 1180px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 18px 20px; display: grid; gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.tile .v { font-size: 30px; font-weight: 600; line-height: 1.1; }
+.tile .d { font-size: 13px; color: var(--ink-2); }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.status i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key-line { width: 16px; height: 2px; background: var(--s1); display: inline-block; border-radius: 1px; }
+.key-dash { width: 16px; height: 0; border-top: 2px dashed var(--s1); display: inline-block; }
+.key-band { width: 16px; height: 10px; background: color-mix(in srgb, var(--s1) 18%, transparent); display: inline-block; border-radius: 2px; }
+.key-dot { width: 9px; height: 9px; background: var(--s2); border-radius: 50%; display: inline-block; }
+
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 8px 10px; font-size: 13px; min-width: 150px; opacity: 0; transition: opacity 120ms ease; }
+.tip.on { opacity: 1; }
+.tip b { font-size: 14px; }
+.tip .row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+
+.themes { display: grid; gap: 10px; }
+.theme { display: grid; grid-template-columns: 110px 1fr 92px; gap: 10px; align-items: center; font-size: 14px; }
+.track { position: relative; height: 10px; background: var(--mid); border-radius: 5px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--s1); border-radius: 5px; }
+.fill.worse { background: var(--neg); }
+.typ { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); border-radius: 1px; }
+.chg { font-size: 13px; color: var(--ink-2); text-align: right; }
+
+.drivers { display: grid; gap: 8px; }
+.drv { display: grid; grid-template-columns: 120px 1fr 64px; gap: 10px; align-items: center; font-size: 14px; }
+.drv .bar { position: relative; height: 12px; }
+.drv .zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--axis); }
+.drv .b { position: absolute; top: 0; bottom: 0; }
+.drv .b.risk-up { left: 50%; background: var(--neg); border-radius: 0 4px 4px 0; }
+.drv .b.risk-down { right: 50%; background: var(--s1); border-radius: 4px 0 0 4px; }
+.key-sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.tested ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.tested table { margin-top: 4px; }
+.drv .val { text-align: right; font-size: 13px; }
+
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+th { font-weight: 600; color: var(--ink-2); font-size: 13px; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+.empty { padding: 40px; color: var(--ink-2); }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  aside { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--grid); }
+  .list { max-height: 220px; }
+  main { padding: 16px; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .two { grid-template-columns: 1fr; }
+  .theme { grid-template-columns: 92px 1fr 84px; }
+  .drv { grid-template-columns: 100px 1fr 56px; }
+  header { padding: 14px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
+</style>
+</head>
+<body>
+<div id="banner"></div>
+<header>
+  <h1>Review Signal</h1>
+  <p class="small" id="sub">Loading…</p>
+</header>
+<div class="app">
+  <aside>
+    <div class="list-tools">
+      <input type="search" id="q" placeholder="Search businesses" aria-label="Search businesses">
+      <select id="sort" aria-label="Sort businesses">
+        <option value="risk">Highest closure risk</option>
+        <option value="drop">Biggest forecast drop</option>
+        <option value="name">Name</option>
+      </select>
+    </div>
+    <div class="list" id="list" role="list"></div>
+  </aside>
+  <main id="main"><p class="empty">Loading data…</p></main>
+</div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) k === "class" ? e.className = v : k === "text" ? e.textContent = v : e.setAttribute(k, v);
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+};
+const svgEl = (tag, attrs = {}) => {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+};
+const fmt = n => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : Math.round(n).toLocaleString();
+const pct = (x, digits = 0) => { const v = +(x * 100).toFixed(digits); return (v > 0 ? "+" : v < 0 ? "-" : "") + Math.abs(v).toFixed(digits) + "%"; };
+const monthName = m => new Date(m + "-01T12:00").toLocaleDateString("en-US", { month: "short", year: "numeric" });
+const addMonths = (m, n) => { const d = new Date(m + "-01T12:00"); d.setMonth(d.getMonth() + n); return d.toISOString().slice(0, 7); };
+
+let D, current, unit = "check-ins";
+
+function riskStatus(r) {
+  const x = r / Math.max(D.base_close_rate, 1e-6);
+  if (x < 1) return ["good", "Low"];
+  if (x < 2) return ["warning", "Elevated"];
+  if (x < 3.5) return ["serious", "High"];
+  return ["critical", "Very high"];
+}
+function status(r) {
+  const [k, label] = riskStatus(r);
+  return el("span", { class: "status" }, el("i", { style: `background: var(--${k})`, "aria-hidden": "true" }), label);
+}
+
+function renderList() {
+  const q = $("#q").value.trim().toLowerCase();
+  const sort = $("#sort").value;
+  let rows = D.businesses.filter(b => !q || b.name.toLowerCase().includes(q) || (b.address || "").toLowerCase().includes(q));
+  const drop = b => b.forecast / Math.max(b.last3, 1) - 1;
+  rows.sort(sort === "risk" ? (a, b) => b.risk - a.risk : sort === "drop" ? (a, b) => drop(a) - drop(b) : (a, b) => a.name.localeCompare(b.name));
+  const list = $("#list");
+  list.replaceChildren(...rows.map(b => {
+    const btn = el("button", { "aria-current": String(b === current), role: "listitem" },
+      el("span", { class: "nm", text: b.name }),
+      b.closed_later ? el("span", { class: "tag", text: "Closed" }) : null,
+      el("span", { class: "small num", text: (b.risk * 100).toFixed(0) + "%" }));
+    btn.title = `${b.name}: closure risk ${(b.risk * 100).toFixed(0)}%`;
+    btn.onclick = () => { current = b; history.replaceState(null, "", "#" + encodeURIComponent(b.id)); renderList(); renderMain(); };
+    return btn;
+  }));
+}
+
+function missText(f, a) {
+  if (a === 0) return f < 1 ? "The forecast was close." : `None were recorded; the forecast said ${fmt(f)}.`;
+  const d = Math.round((f / Math.max(a, 1) - 1) * 100);
+  return d === 0 ? "The forecast was right on." : `The forecast was ${Math.abs(d)}% ${d < 0 ? "low" : "high"}.`;
+}
+
+function tile(label, value, detail, extra) {
+  return el("div", { class: "tile" }, el("p", { class: "small", text: label }), el("p", { class: "v", text: value }), extra || null,
+    detail ? el("p", { class: "d", text: detail }) : null);
+}
+
+function renderMain() {
+  const b = current, main = $("#main");
+  if (!b) { main.replaceChildren(el("p", { class: "empty", text: "No businesses match." })); return; }
+  const change = b.forecast / Math.max(b.last3, 1) - 1;
+  const head = el("div", { style: "display:grid;gap:4px" },
+    el("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, el("h2", { text: b.name }),
+      b.closed_later ? el("span", { class: "tag", text: "Closed by early 2022" }) : null),
+    el("p", { class: "small", text: [b.address, (b.categories || "").split(",").slice(0, 3).join(", ")].filter(Boolean).join(" · ") }));
+
+  const actualTile = b.actual == null
+    ? tile("What actually happened", "Not yet known", "")
+    : tile("What actually happened", fmt(b.actual),
+        `${unit} in the 3 months after. ${missText(b.forecast, b.actual)}`);
+  const tiles = el("div", { class: "tiles" },
+    tile("Forecast, next 3 months", fmt(b.forecast), `${unit}, likely ${fmt(b.low)} to ${fmt(b.high)}`),
+    b.last3 < 1
+      ? tile("Change vs last 3 months", "None before", `No ${unit} in the last 3 months`)
+      : tile("Change vs last 3 months", pct(change), `Last 3 months: ${fmt(b.last3)} ${unit}`),
+    tile("Closure risk, next 12 months", (b.risk * 100).toFixed(0) + "%",
+      `Typical business here: ${(D.base_close_rate * 100).toFixed(0)}%`, status(b.risk)),
+    actualTile);
+
+  main.replaceChildren(head, tiles, trafficCard(b), el("div", { class: "two" }, themesCard(b), driversCard(b)), testedCard());
+}
+
+function trafficCard(b) {
+  const card = el("section", { class: "card" });
+  card.append(el("h3", { text: `Monthly ${unit}, with the forecast made in ${monthName(D.asof)}` }),
+    el("div", { class: "legend" },
+      el("span", {}, el("i", { class: "key-line" }), "Known at forecast time"),
+      el("span", {}, el("i", { class: "key-dash" }), "Forecast"),
+      el("span", {}, el("i", { class: "key-band" }), "Likely range"),
+      el("span", {}, el("i", { class: "key-dot" }), "What actually happened")));
+  const months = []; for (let i = -23; i <= 3; i++) months.push(addMonths(D.asof, i));
+  const byM = Object.fromEntries(b.history.map(h => [h.m, h]));
+  const firstM = b.history.length ? b.history[0].m : months[0];
+  const known = months.slice(0, 24).map(m => m < firstM ? null : byM[m] ? byM[m].t : 0);
+  const after = months.slice(24).map(m => byM[m] ? byM[m].t : null);
+  const f = { mid: b.forecast / 3, lo: b.low / 3, hi: b.high / 3 };
+  // draw at the real width so text stays 12px on phones
+  const W = Math.max(300, Math.min(1100, $("#main").clientWidth - 2 * 21 - (innerWidth > 860 ? 48 : 32) + 32)), H = W < 600 ? 220 : 260;
+  const L = 40, R = 12, T = 12, B = 28;
+  const ymax = Math.max(...known.filter(v => v != null), ...after.filter(v => v != null), f.hi) * 1.1 || 1;
+  const step = niceStep(ymax / 4);
+  const top = Math.ceil(ymax / step) * step;
+  const x = i => L + (i / (months.length - 1)) * (W - L - R);
+  const y = v => T + (1 - v / top) * (H - T - B);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${b.name}: monthly ${unit} for 24 months, forecast of ${fmt(b.forecast)} for the next 3 months` });
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    svg.append(svgEl("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+    const t = svgEl("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end" }); t.textContent = fmt(v); svg.append(t);
+  }
+  months.forEach((m, i) => {
+    if (i > 23 || (23 - i) % 6 !== 0) return;
+    const t = svgEl("text", { x: x(i), y: H - 8, "text-anchor": "middle" }); t.textContent = monthName(m); svg.append(t);
+  });
+  // forecast band and line across the 3 future months, from the as-of point
+  const i0 = 23, i1 = 26;
+  svg.append(svgEl("path", { d: `M${x(i0)},${y(known[23])} L${x(i0 + 1)},${y(f.hi)} L${x(i1)},${y(f.hi)} L${x(i1)},${y(f.lo)} L${x(i0 + 1)},${y(f.lo)} Z`,
+    fill: "var(--s1)", "fill-opacity": 0.14 }));
+  svg.append(svgEl("path", { d: `M${x(i0)},${y(known[23])} L${x(i0 + 1)},${y(f.mid)} L${x(i1)},${y(f.mid)}`,
+    fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-dasharray": "5 4", "stroke-linecap": "round" }));
+  svg.append(svgEl("line", { x1: x(i0), x2: x(i0), y1: T, y2: H - B, stroke: "var(--axis)", "stroke-width": 1 }));
+  const nowT = svgEl("text", { x: x(i0) - 6, y: T + 10, "text-anchor": "end" }); nowT.textContent = "Forecast made"; svg.append(nowT);
+  svg.append(svgEl("path", { d: known.map((v, i) => v == null ? "" : `${i && known[i - 1] != null ? "L" : "M"}${x(i)},${y(v)}`).join(" "),
+    fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  svg.append(svgEl("circle", { cx: x(23), cy: y(known[23]), r: 4, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }));
+  after.forEach((v, j) => { if (v != null) svg.append(svgEl("circle", { cx: x(24 + j), cy: y(v), r: 4.5, fill: "var(--s2)", stroke: "var(--surface)", "stroke-width": 2 })); });
+
+  // crosshair + tooltip
+  const wrap = el("div", { class: "chart" }, svg);
+  const tip = el("div", { class: "tip", role: "status" });
+  const cross = svgEl("line", { y1: T, y2: H - B, stroke: "var(--muted)", "stroke-width": 1, opacity: 0 });
+  svg.append(cross);
+  const hit = svgEl("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent", tabindex: 0 });
+  svg.append(hit);
+  const show = i => {
+    const m = months[i];
+    const rows = [];
+    if (i <= 23) rows.push(known[i] == null ? ["No data yet", "", null] : [fmt(known[i]), `${unit}`, "var(--s1)"]);
+    else {
+      rows.push([`${fmt(f.mid)} (${fmt(f.lo)} to ${fmt(f.hi)})`, "forecast", "var(--s1)"]);
+      if (after[i - 24] != null) rows.push([fmt(after[i - 24]), "actual", "var(--s2)"]);
+    }
+    const h = byM[m];
+    if (h && h.n) rows.push([`${h.n} review${h.n === 1 ? "" : "s"}, ${h.stars} stars avg`, "", null]);
+    tip.replaceChildren(el("div", { class: "small", text: monthName(m) }),
+      ...rows.map(([v, lab, c]) => el("div", { class: "row" }, c ? el("i", { style: `width:12px;height:2px;background:${c};display:inline-block` }) : null,
+        el("b", { text: v }), lab ? el("span", { class: "small", text: lab }) : null)));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+    const box = svg.getBoundingClientRect(), px = (x(i) / W) * box.width;
+    tip.style.left = Math.min(px + 12, box.width - 230) + "px"; tip.style.top = "8px";
+    tip.classList.add("on");
+  };
+  let last = 23;
+  hit.addEventListener("pointermove", e => {
+    const box = svg.getBoundingClientRect(), vx = ((e.clientX - box.left) / box.width) * W;
+    last = Math.max(0, Math.min(months.length - 1, Math.round(((vx - L) / (W - L - R)) * (months.length - 1))));
+    show(last);
+  });
+  hit.addEventListener("pointerleave", () => { tip.classList.remove("on"); cross.setAttribute("opacity", 0); });
+  hit.addEventListener("focus", () => show(last));
+  hit.addEventListener("blur", () => { tip.classList.remove("on"); cross.setAttribute("opacity", 0); });
+  hit.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") show(last = Math.min(months.length - 1, last + 1));
+    if (e.key === "ArrowLeft") show(last = Math.max(0, last - 1));
+  });
+  wrap.append(tip);
+
+  const table = el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "Month" }), el("th", { class: "r", text: unit }),
+    el("th", { class: "r", text: "Reviews" }), el("th", { class: "r", text: "Avg stars" }))),
+    el("tbody", {}, ...months.map((m, i) => {
+      const h = byM[m];
+      return el("tr", {}, el("td", { text: monthName(m) + (i > 23 ? " (after forecast)" : "") }),
+        el("td", { class: "r", text: h ? fmt(h.t) : "0" }), el("td", { class: "r", text: h ? h.n : "0" }),
+        el("td", { class: "r", text: h && h.stars != null ? h.stars : "" }));
+    })));
+  card.append(wrap, el("details", {}, el("summary", { text: "Show as a table" }), table));
+  return card;
+}
+
+function niceStep(x) {
+  const p = Math.pow(10, Math.floor(Math.log10(Math.max(x, 1e-9)))), r = x / p;
+  return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p;
+}
+
+function themesCard(b) {
+  const card = el("section", { class: "card" }, el("h3", { text: "What customers complain about, last 3 months" }),
+    el("p", { class: "small", text: "Share of reviews with a complaint about each theme. The black tick is the typical business." }));
+  const max = Math.max(...Object.values(b.themes).map(t => Math.max(t.now, t.typical))) * 1.15 || 1;
+  const list = el("div", { class: "themes" });
+  for (const [k, t] of Object.entries(b.themes)) {
+    const worse = t.now > t.typical * 1.15;
+    const pts = Math.round(t.change * 100);
+    list.append(el("div", { class: "theme", title: `${D.themes[k]}: ${(t.now * 100).toFixed(0)}% of reviews now, typical ${(t.typical * 100).toFixed(0)}%` },
+      el("span", { text: D.themes[k] }),
+      el("div", { class: "track", role: "img", "aria-label": `${(t.now * 100).toFixed(0)} percent, typical ${(t.typical * 100).toFixed(0)} percent` },
+        el("div", { class: "fill" + (worse ? " worse" : ""), style: `width:${(t.now / max) * 100}%` }),
+        el("div", { class: "typ", style: `left:calc(${(t.typical / max) * 100}% - 1px)` })),
+      el("span", { class: "chg num", text: `${(t.now * 100).toFixed(0)}% (${pts > 0 ? "+" : ""}${pts} pts)` })));
+  }
+  card.append(list, el("p", { class: "small muted", text: "Red means well above typical. Points show the change against the 12 months before." }));
+  return card;
+}
+
+function driversCard(b) {
+  const card = el("section", { class: "card" }, el("h3", { text: "What drives the closure risk" }),
+    el("p", { class: "small", text: "How much each factor raises or lowers this restaurant's chance of closing, compared with a typical one." }));
+  const logs = b.drivers.map(d => Math.log(d.times));
+  const max = Math.min(Math.max(...logs.map(Math.abs), Math.log(1.25)), Math.log(10));
+  const list = el("div", { class: "drivers" });
+  b.drivers.forEach((d, i) => {
+    const w = Math.min(50, (Math.abs(logs[i]) / max) * 50);
+    const up = d.times >= 1;
+    const label = d.times >= 10 ? "10x+" : `${d.times.toFixed(1)}x`;
+    const said = up ? `${d.name} makes closing ${d.times.toFixed(1)} times as likely` : `${d.name} lowers the chance of closing to ${d.times.toFixed(1)} times`;
+    list.append(el("div", { class: "drv", title: said },
+      el("span", { text: d.name }),
+      el("div", { class: "bar", role: "img", "aria-label": said },
+        el("div", { class: "zero" }), el("div", { class: "b " + (up ? "risk-up" : "risk-down"), style: `width:${w}%` })),
+      el("span", { class: "val num", text: label })));
+  });
+  card.append(list, el("div", { class: "legend" },
+    el("span", {}, el("i", { class: "key-sq", style: "background:var(--neg)" }), "Raises risk"),
+    el("span", {}, el("i", { class: "key-sq", style: "background:var(--s1)" }), "Lowers risk")));
+  return card;
+}
+
+function closedLine() {
+  const all = D.businesses, top = [...all].sort((a, b) => b.risk - a.risk).slice(0, 20);
+  const c = top.filter(b => b.closed_later).length, t = all.filter(b => b.closed_later).length;
+  return `Check against reality: of the 20 restaurants this page ranks riskiest in ${monthName(D.asof)}, ${c} had closed by the time the data ends in early 2022, against ${t} of all ${all.length} (${Math.round(t / all.length * 100)}%). Closed restaurants are marked in the list.`;
+}
+
+function testedCard() {
+  const m = D.metrics;
+  const card = el("section", { class: "card tested" }, el("h3", { text: "What we tested, and what we changed" }));
+  card.append(el("p", { text: "The idea: customer reviews warn you about a drop in business before your sales do. So a forecast that reads the reviews should beat one that only looks at past traffic." }),
+    el("p", { class: "small", text: `How: models learned from earlier months, then forecast months they never saw, across ${m.traffic.businesses.toLocaleString()} restaurants. Lower miss is better.` }));
+  const p1 = x => (x * 100).toFixed(1) + "%";
+  card.append(el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { text: "Traffic forecast" }), el("th", { class: "r", text: "History only" }), el("th", { class: "r", text: "History plus reviews" }))),
+    el("tbody", {}, ...m.horizons.map(h => el("tr", {}, el("td", { text: `${h.months} months ahead` }),
+      el("td", { class: "r", text: p1(h.history) }), el("td", { class: "r", text: p1(h.reviews) }))))));
+  card.append(el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { text: "Closure risk ranking (AUC, higher is better)" }), el("th", { class: "r", text: "History only" }), el("th", { class: "r", text: "History plus reviews" }))),
+    el("tbody", {}, ...m.closure.map(c => el("tr", {}, el("td", { text: `Test year ${c.year}` }),
+      el("td", { class: "r", text: c.history.auc.toFixed(2) }), el("td", { class: "r", text: c.reviews.auc.toFixed(2) }))))));
+  card.append(el("h3", { text: "What we found" }),
+    el("ul", {},
+      el("li", { text: "Reviews did not improve the traffic forecast at any range. Past traffic already holds what the reviews would have told us." }),
+      el("li", { text: "Reviews did help flag restaurants likely to close: clearly in 2017, slightly in 2018." }),
+      el("li", { text: closedLine() }),
+      el("li", { text: "Reviews are the only place that says why customers are unhappy." })),
+    el("h3", { text: "What we changed" }),
+    el("ul", {},
+      el("li", { text: "The forecast on this page uses traffic history only, because it tested best." }),
+      el("li", { text: "Reviews feed the closure risk and the complaint breakdown, where they add something." }),
+      el("li", { text: "We dropped a planned \u201cfix this complaint, gain this much\u201d slider. The data did not support that promise." })),
+    el("p", { class: "small", text: `The forecast's likely range held the real result ${(m.traffic.range_coverage * 100).toFixed(0)}% of the time (it aims for 80%).` }));
+  return card;
+}
+
+(async function init() {
+  const src = new URLSearchParams(location.search).get("data") || "data.json";
+  D = await (await fetch(src)).json();
+  if (/test/i.test(D.label || "")) $("#banner").replaceChildren(el("div", { class: "test-banner", text: "Test data: these businesses and numbers are fake and only for checking the page." }));
+  $("#sub").textContent = `Reviews tell you why. Traffic history tells you how much. ${D.label ? D.label + ", " : ""}forecasts made in ${monthName(D.asof)} and checked against what happened next.`;
+  const id = decodeURIComponent(location.hash.slice(1));
+  // open on the riskiest restaurant that still had real traffic, so the chart has something to show
+  current = D.businesses.find(b => b.id === id) || D.businesses.find(b => b.last3 >= 15 && b.actual != null) || D.businesses[0];
+  $("#q").oninput = () => renderList();
+  $("#sort").oninput = () => renderList();
+  renderList(); renderMain();
+  let lastW = innerWidth, t;
+  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (innerWidth !== lastW) { lastW = innerWidth; renderMain(); } }, 150); });
+})();
+</script>
+</body>
+</html>
