@@ -7,6 +7,8 @@ and changed the product to match the evidence.**
 Built on the Yelp Open Dataset: 1,616 Philadelphia restaurants with 100 or
 more reviews, 2005 to early 2022.
 
+![The Review Signal dashboard: a restaurant's forecast, closure risk and monthly check-ins](docs/dashboard.png)
+
 ## The problem
 
 A small restaurant owner gets reviews every week but has no analyst. The
@@ -56,6 +58,8 @@ Yelp check-ins stand in for foot traffic.
   9 had closed by the time the data ends in early 2022, against 62 of 547
   overall (11%).
 - **Reviews are the only source that says *why*** customers are unhappy.
+
+![The "What we tested" section of the dashboard](docs/findings.png)
 
 ## What we changed
 
