@@ -173,7 +173,10 @@ def main():
             "history": hist,
         })
     out.sort(key=lambda d: -d["risk"])
-    data = {"asof": f"{asof:%Y-%m}", "label": a.label, "base_close_rate": base_close,
+    import pyarrow.parquet as pq
+    study = {"reviews": int(pq.ParquetFile(os.path.join(a.work, "reviews.parquet")).metadata.num_rows),
+             "restaurants": len(names)}
+    data = {"asof": f"{asof:%Y-%m}", "label": a.label, "base_close_rate": base_close, "study": study,
             "themes": LABELS, "metrics": metrics, "businesses": out}
     with open(os.path.join(a.out, "data.json"), "w") as f:
         json.dump(data, f, separators=(",", ":"))
